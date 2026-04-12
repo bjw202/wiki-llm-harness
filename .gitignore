@@ -1,0 +1,34 @@
+# Wiki 콘텐츠 — 개인 지식이므로 저장소에 포함하지 않음 (구조만 유지)
+sources/*
+!sources/.gitkeep
+
+wiki/summaries/*
+!wiki/summaries/.gitkeep
+
+wiki/entities/*
+!wiki/entities/.gitkeep
+
+wiki/concepts/*
+!wiki/concepts/.gitkeep
+
+wiki/syntheses/*
+!wiki/syntheses/.gitkeep
+
+wiki/assets/*
+!wiki/assets/.gitkeep
+
+# 위키 메타 파일 (사용자별 데이터 — 초기화 시 자동 생성)
+wiki/index.md
+wiki/log.md
+
+# 진행 상태 파일
+wiki/.ingest-progress.json
+
+# Obsidian 설정 (vault별 설정은 vault 사용자가 직접)
+wiki/.obsidian/workspace.json
+wiki/.obsidian/workspace-mobile.json
+
+# 시스템
+.DS_Store
+*.swp
+*~
