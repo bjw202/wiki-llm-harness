@@ -34,6 +34,7 @@ description: "소스 자료를 위키에 수집(ingest)하는 스킬. 파일/URL
 ### 4. 소스 분석 및 추출 (배치 내 파일별)
 
 각 소스를 읽고 추출한다:
+
 - **엔티티**: 세상에 하나뿐인 고유한 대상 — 특정 인물, 회사, 제품 모델, 장소 (예: Andrej Karpathy, OpenAI, GPT-4, 서울)
 - **개념**: 여러 인스턴스가 존재할 수 있는 추상 카테고리 — 이론, 기법, 방법론, 원리 (예: 트랜스포머, 강화학습, 디지털 트윈 패턴)
 - **사실**: 데이터, 통계, 날짜, 인용문
@@ -42,12 +43,14 @@ description: "소스 자료를 위키에 수집(ingest)하는 스킬. 파일/URL
 #### Entity vs Concept 판단 휴리스틱
 
 "이것이 세상에 하나뿐인가?"를 묻는다:
+
 - **하나뿐** → entity (Andrej Karpathy는 1명, GPT-4는 특정 모델)
 - **여러 사례로 존재** → concept (LLM은 여러 모델의 범주, 양자역학은 이론)
 
 경계 사례 참고:
+
 | 용어 | 분류 | 이유 |
-|------|------|------|
+| --- | --- | --- |
 | GPT-4 | entity | OpenAI의 특정 모델 인스턴스 |
 | LLM | concept | 여러 모델을 포괄하는 범주 |
 | OpenAI | entity | 특정 회사 |
@@ -58,9 +61,10 @@ description: "소스 자료를 위키에 수집(ingest)하는 스킬. 파일/URL
 
 ### 5. Summary 페이지 생성 (소스 1개 = Summary 1개)
 
-**파일명: `{주제}-{관점/유형}.md`** — 소스 파일명을 그대로 쓰지 않는다. Obsidian 그래프에서 의미 있는 이름이어야 한다.
+**파일명:** `{주제}-{관점/유형}.md` — 소스 파일명을 그대로 쓰지 않는다. Obsidian 그래프에서 의미 있는 이름이어야 한다.
 
 파일명 결정 절차:
+
 1. 소스의 핵심 주제를 파악한다 (예: wiki-llm, digital-twin)
 2. 소스의 성격/관점을 파악한다 (예: web-research, academic-review, architecture-design)
 3. `{주제}-{관점}.md`로 조합한다 (예: `digital-twin-community-voices.md`)
@@ -105,8 +109,7 @@ updated: YYYY-MM-DD
 
 **파일명 결정**: 후보 생성 → Glob 충돌 검사 → 같은 주제면 갱신, 다른 주제면 접미사.
 
-**새 페이지**: frontmatter + 본문 + 출처 (SCHEMA.md 규칙 참조)
-**기존 페이지 갱신**: 기존 내용 보존, `updated` 갱신, `sources` 배열에 추가. 모순 시 `> [!warning]` 콜아웃.
+**새 페이지**: frontmatter + 본문 + 출처 (SCHEMA.md 규칙 참조) **기존 페이지 갱신**: 기존 내용 보존, `updated` 갱신, `sources` 배열에 추가. 모순 시 `> [!warning]` 콜아웃.
 
 **출처 표기**: `(출처: `sources/파일명`)` — wiki-link가 아닌 코드 형식. Obsidian vault 밖의 파일을 `[[]]`로 참조하면 그래프에 유령 노드가 생긴다.
 
@@ -120,7 +123,8 @@ updated: YYYY-MM-DD
 
 **index.md**: Summaries, Entities, Concepts, Syntheses 4개 섹션에 새 페이지 삽입.
 
-**log.md**: 배치 단위로 기록:
+**.wiki-log.md**: 배치 단위로 기록:
+
 ```markdown
 ## [YYYY-MM-DD] ingest | 배치 N (파일 M개)
 - 소스: file-a.pdf, file-b.md
@@ -136,7 +140,7 @@ updated: YYYY-MM-DD
 ## 에러 핸들링
 
 | 상황 | 전략 |
-|------|------|
+| --- | --- |
 | 소스 읽기 실패 | `failed`에 기록, 나머지 계속 |
 | 서머리 30줄 초과 | 상세 내용을 concept/entity로 이동, 서머리에는 링크만 |
 | 파일명 충돌 | 내용 비교 → 같으면 갱신, 다르면 접미사 |
