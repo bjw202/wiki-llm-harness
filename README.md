@@ -1,282 +1,261 @@
 # wiki-llm-harness
 
-**Andrej Karpathy의 [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) 패턴을 Claude Code 스킬로 구현한 지식 관리 하네스.**
+**Claude Code + Obsidian으로 만드는 개인 지식 위키.** 논문·기사·메모를 폴더에 넣고 "위키에 추가해줘"라고 말하면, Claude가 읽고·요약하고·연결하고·카탈로그까지 정리한다. 질문하면 위키에서만 답한다.
 
-Obsidian을 편집기로 쓰고, Claude가 위키를 유지·관리한다. 인간은 소스를 큐레이션하고 질문만 하면, LLM이 읽기·요약·교차참조·정합성 검증을 전담한다.
-
----
-
-## 목차
-
-1. [Karpathy의 철학](#karpathy의-철학)
-2. [아키텍처](#아키텍처)
-3. [설계 결정의 배경 — 실전에서 부딪힌 문제들](#설계-결정의-배경--실전에서-부딪힌-문제들)
-4. [설치 및 설정](#설치-및-설정)
-5. [사용법](#사용법)
-6. [프로젝트 구조](#프로젝트-구조)
+Andrej Karpathy의 [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) 패턴 구현.
 
 ---
 
-## Karpathy의 철학
+## 이런 분께 추천
 
-Karpathy의 gist를 관통하는 한 문장:
+- 매일 읽는 논문·기사를 **영속적인 지식 베이스**로 축적하고 싶은 개인 연구자
+- 팀의 도메인 지식을 **AI가 유지보수하는** 위키로 관리하고 싶은 스타트업
+- 수동으로 Obsidian 쓰는 것이 지겨운 사람 — 링크·요약·정리를 LLM에 위임
+- RAG 시스템을 직접 구축하는 것이 무거워 보이는 사람
 
-> "지식 기반 유지보수의 지루한 부분은 읽기나 사고가 아니라 **장부 정리(bookkeeping)**다."
-
-기존 RAG는 질의마다 원본을 재발견한다. 매번 인터프리터가 돌아가는 셈이다. wiki-llm은 다르게 접근한다 — 소스를 **한 번 컴파일**해서 영속적 마크다운 위키로 저장하고, 질의 시에는 이 위키만 읽는다. 컴파일러와 인터프리터의 차이다.
-
-### 3계층 아키텍처
-
-| 계층 | 역할 | 소유자 |
-|------|------|--------|
-| **Raw Sources** | 불변 원본 자료 (논문, 기사, 메모) | 인간이 큐레이션 |
-| **Wiki** | LLM이 유지하는 마크다운 파일 집합 | LLM이 관리 |
-| **Schema** | 위키 규칙·컨벤션 정의 | 인간이 설계, LLM이 준수 |
-
-### 3대 오퍼레이션
-
-- **Ingest** — 새 소스를 처리해 10~15개 관련 페이지를 동시에 갱신. 교차 참조가 자동 유지됨
-- **Query** — 위키 페이지를 검색·종합해 출처 기반 답변 생성. 고가치 답변은 위키로 역환류
-- **Lint** — 모순, 고아 페이지, 깨진 링크, 오래된 주장 탐지. 위키의 건강 유지
-
-### 4가지 페이지 유형 (Karpathy 원안)
-
-1. **Summary** — 소스 1개당 1개의 허브 페이지
-2. **Entity** — 고유 명사 (인물, 조직, 제품)
-3. **Concept** — 추상 개념 (이론, 기술, 방법론)
-4. **Synthesis** — 교차 분석·통합 정리
+**적합 규모**: &lt; 100K 토큰 (\~150-200 페이지). 그 이상이면 RAG 하이브리드 고려.
 
 ---
 
-## 아키텍처
+## 30초 사용 예시
 
-Claude Code의 **스킬(Skill)**로 구현했다. 에이전트는 사용하지 않는다 — 다른 플랫폼에서도 동작하도록 이식성을 우선했다.
+```bash
+# 1. 저장소 복제
+git clone https://github.com/bjw202/wiki-llm-harness.git
+cd wiki-llm-harness
 
-```
-사용자 요청
-    ↓
-CLAUDE.md (세션 시작 시 자동 로드) — 어떤 스킬을 쓸지 라우팅
-    ↓
-┌────────────┬─────────────┬────────────┐
-│ wiki-ingest│  wiki-query │  wiki-lint │
-│  (수집)    │   (질의응답)│   (점검)   │
-└────────────┴─────────────┴────────────┘
-    ↓
-wiki/*.md 생성/갱신 (Obsidian이 그대로 열 수 있음)
+# 2. sources/ 폴더에 자료 넣기
+cp ~/Downloads/paper.pdf sources/
+
+# 3. Claude Code 실행 후 요청
+claude
+> sources 폴더의 파일을 위키에 추가해줘
 ```
 
-각 스킬은 독립적으로 트리거된다. 사용자가 "X에 대해 알려줘" 하면 wiki-query가, "이 문서 위키에 넣어줘" 하면 wiki-ingest가 자동 실행된다.
+Claude가 자동으로 읽고, `wiki/` 폴더에 요약·엔티티·개념 페이지를 만든다.
+
+```bash
+# 4. 위키에 질문
+> 이 논문에서 핵심 발견이 뭐야?
+
+# 5. 주기적 건강 점검
+> 위키 점검해줘
+```
 
 ---
 
-## 설계 결정의 배경 — 실전에서 부딪힌 문제들
+## 5분 빠른 시작 가이드
 
-이 하네스는 처음부터 완성형으로 설계된 것이 아니라, 실제로 15개 소스 파일을 ingest하고 Obsidian으로 열어보는 과정에서 부딪힌 문제를 하나씩 해결해가며 만들어졌다. 각 설계 선택의 이유가 여기에 있다.
-
-### 문제 1: 100개 파일을 한 번에 넣으면 컨텍스트가 터진다
-
-**증상:** 소스가 많아지면 LLM이 모두 읽기 전에 컨텍스트 윈도우를 초과한다.
-
-**해결:** 배치 처리 + 재개 가능한 진행 상태 저장.
-- 기본 5개 파일/배치 (크기에 따라 3~10개 조절)
-- 각 배치 후 `wiki/.ingest-progress.json`에 상태 저장
-- 세션이 끊겨도 다음 실행 시 큐의 남은 파일부터 이어서 처리
-
-→ `.claude/skills/wiki-ingest/skill.md`의 배치 처리 워크플로우
-
-### 문제 2: 서머리가 점점 비대해져 소스의 복제본이 된다
-
-**증상:** 다른 프로젝트에서 발견된 패턴 — ingest를 여러 번 하다 보면 summary 파일이 원본의 80%를 그대로 옮기게 되어 수백 줄로 불어난다. 서머리끼리 중복·모순이 생기고, query 시 LLM이 서머리만 읽고 정작 concept 페이지를 놓치는 문제 발생.
-
-**해결:** Summary = **허브 페이지** 원칙.
-- 소스 1개 = summary 1개
-- **30줄 이내 엄수**
-- 서머리에 넣는 것: 핵심 주장 1~3문장, 발견 3~7개 한 줄 bullet, 추출된 페이지 링크, 신뢰도 한 줄 평가
-- 서머리에 넣지 않는 것: 데이터 테이블, 인용문, 상세 비교 — 이건 concept/entity 페이지의 역할
-- 30줄 초과 시 상세 내용을 concept으로 이동, 서머리에는 링크만
-
-→ `SCHEMA.md`의 Summary 페이지 규칙
-
-### 문제 3: LLM이 지은 파일명이 기존 페이지와 겹친다
-
-**증상:** `quantum-computing.md`가 이미 있는데 LLM이 다른 소스에서 같은 이름을 생성.
-
-**해결:** 2단계 충돌 감지.
-1. 후보 파일명 생성 → Glob으로 존재 여부 확인
-2. 있으면 기존 내용과 비교 → 같은 주제면 갱신 모드, 다른 주제면 `-2`, `-3` 접미사
-
-### 문제 4: 소스 파일명이 위키 페이지 이름으로 무의미하다
-
-**증상:** `01-web-research.md`를 그대로 summary 이름으로 쓰면 Obsidian 그래프에서 노드가 의미 없어 보인다.
-
-**해결:** **`{주제}-{관점/유형}.md`** 네이밍 규칙.
-- 소스 `01-web-research.md` → summary `digital-twin-roi-web-survey.md`
-- 주제는 concept/entity 페이지 이름과 겹칠 수 있으므로, 관점/유형을 붙여 구분
-- concept은 "무엇에 대한 지식", summary는 "누가/어떻게 조사한 결과"이므로 자연스럽게 역할 분리
-
-### 문제 5: sources/ 파일을 `[[wiki-link]]`로 참조하니 Obsidian 그래프에 유령 노드가 생긴다
-
-**증상:** 본문에 `[[sources/01-web-research.md]]`라고 쓰면 Obsidian이 vault 밖 파일을 "존재하지 않는 페이지"로 인식해 점선 유령 노드로 그래프에 표시한다.
-
-**해결:** sources 참조는 **wiki-link 대신 코드 형식** 사용.
-- ❌ `[[sources/01-web-research.md]]`
-- ✅ `` `sources/01-web-research.md` ``
-
-vault 경계를 존중하는 것이 핵심 — Obsidian은 `wiki/` 폴더를 vault로 보고, `sources/`는 그 밖이다.
-
-### 문제 6: Obsidian이 파일을 멋대로 수정한다
-
-**증상:** Ingest 후 Obsidian을 열면 일부 파일의 YAML frontmatter가 한 줄로 합쳐지고, `[`가 `\[`로 이스케이프되고, `## title:` 같은 잘못된 마크다운으로 변환된다.
-
-**근본 원인:** Obsidian의 `processFrontMatter` API가 YAML을 파괴적으로 재작성한다 ([Obsidian 포럼에서 확인된 장기 미해결 이슈](https://forum.obsidian.md/t/yaml-properties-api-processfrontmatter-removes-alters-string-quotes-comments-types-formatting/65851)). Properties 플러그인, Bases 플러그인, Properties in document 설정 모두 이 API를 호출한다. 게다가 `.obsidian/`이 프로젝트 루트에 생성되면 Obsidian이 전체 프로젝트를 vault로 인식해 `.claude/skills/` 파일까지 파괴했다.
-
-**해결 3중 방어:**
-1. `.obsidian/`을 `wiki/` 폴더 안으로 이동 — vault 범위를 `wiki/`로 제한
-2. `app.json`에 `"propertiesInDocument": "source"` 설정 — GUI 파서 우회
-3. `core-plugins.json`에서 `"properties": false`, `"bases": false` 설정 — 두 플러그인 모두 비활성화
-
-한 가지만 해도 증상이 줄지만, 완전 제거하려면 셋 다 필요하다.
-
-→ README "Obsidian 설정" 섹션
-
-### 문제 7: 오케스트레이터 스킬이 과잉 설계였다
-
-**초기 설계:** `wiki-llm` 오케스트레이터 스킬이 라우팅 담당.
-
-**문제:** 스킬 라우팅·프로젝트 구조 정의는 모든 세션에서 필요하므로 CLAUDE.md가 적합. 오케스트레이터 스킬은 별도 트리거 단계를 추가할 뿐 가치가 없었다. 게다가 ingest/query/lint 스킬과 트리거 키워드가 겹쳐 혼란 유발.
-
-**해결:** 오케스트레이터 스킬 삭제. CLAUDE.md로 라우팅 통합.
-
-### 문제 8: log.md가 Obsidian 그래프에 노이즈로 들어왔다
-
-**증상:** `wiki/log.md`가 vault 안에 있으니 Obsidian이 ingest/query/lint 이력을 모두 위키 페이지로 취급. 그래프에 "2026-04-12 ingest" 같은 노드가 등장, 시간이 갈수록 누적되어 그래프가 지저분해지고 검색 결과에도 섞임.
-
-**해결:** log는 **지식이 아니라 운영 메타데이터**. vault 밖 `.wiki-log.md` (프로젝트 루트)로 이동.
-- dot-prefix로 Obsidian이 기본 숨김 처리
-- wiki 페이지들 간 `[[links]]`는 그대로 유지됨 (log→wiki 방향은 vault 밖이어도 무방)
-- `.git/` 같은 메타데이터 파일과 같은 취급
-
-반면 `index.md`는 vault 안에 유지 — 지식 카탈로그이자 그래프 허브 역할이므로 Obsidian에 노출되어야 함.
-
-### 문제 9: query 스킬이 설계 형식을 따르지 않았다
-
-**증상:** 스킬이 "답변 끝에 참조 페이지 목록 붙여라"라고 했는데, 실제 실행 시 LLM이 이를 무시하고 본문에 인라인 `(참조: ...)`로 대체. log.md 기록도 빠뜨림.
-
-**해결:** 명령형을 피하고 **Why** 설명.
-- "이 형식은 Obsidian에서 백링크 추적과 쿼리 감사를 가능하게 하므로 생략하지 않는다"
-- "답변 생성과 로그 기록은 하나의 연산이다 — 답변만 하고 로그를 빠뜨리면 연산이 미완료된 것이다"
-- 역기록 여부를 **항상** 명시하도록 형식에 포함 (없을 때도 "없음 — 기존 정보의 종합이므로")
-
-→ Claude는 강압적 지시("ALWAYS")보다 이유를 이해했을 때 더 잘 따른다는 원칙의 실증.
-
----
-
-## 설치 및 설정
-
-### 1. 저장소 복제
+### Step 1 — 저장소 준비
 
 ```bash
 git clone https://github.com/bjw202/wiki-llm-harness.git
 cd wiki-llm-harness
 ```
 
-### 2. Obsidian 설정
-
-Obsidian에서 **wiki/ 폴더를 vault로** 연다 (프로젝트 루트가 아님).
+폴더 구조가 이렇게 되어 있다:
 
 ```
-File → Open vault → Open folder as vault → wiki/ 선택
+wiki-llm-harness/
+├── sources/       ← 여기에 원본 자료 넣기
+├── wiki/          ← Claude가 여기에 위키 생성 (Obsidian vault)
+├── .claude/skills/  ← 3개 스킬 (ingest, query, lint)
+├── CLAUDE.md      ← Claude가 세션 시작 시 자동 로드
+└── SCHEMA.md      ← 위키 규칙
 ```
 
-**frontmatter 파괴 방지 설정 3가지 (필수):**
+### Step 2 — Obsidian 설정 (필수 3가지)
 
-Obsidian의 `processFrontMatter` API는 YAML 포맷을 파괴적으로 재작성하는 [알려진 버그](https://forum.obsidian.md/t/yaml-properties-api-processfrontmatter-removes-alters-string-quotes-comments-types-formatting/65851)가 있다. 아래 3가지 설정으로 비활성화해야 Claude가 생성한 frontmatter가 보존된다.
+> ⚠️ **이 설정을 건너뛰면** Obsidian이 Claude가 생성한 파일의 YAML frontmatter를 파괴하는 [알려진 버그](https://forum.obsidian.md/t/yaml-properties-api-processfrontmatter-removes-alters-string-quotes-comments-types-formatting/65851)가 발생합니다.
 
-1. **Editor → Properties in document → Source**
-   - `Visible`/`Hidden` 모드는 GUI로 프로퍼티를 처리하며 파일을 재포맷함
-   - `Source`는 원본 텍스트 그대로 유지
+1. `wiki/` **폴더를 vault로 연다** (프로젝트 루트 ❌, `wiki/` 폴더 ✓)
 
-2. **Core plugins → Properties 토글 OFF**
-   - Properties 코어 플러그인이 파일을 건드리지 않게 함
+   - Obsidian → `File` → `Open vault` → `Open folder as vault` → `wiki/` 선택
 
-3. **Core plugins → Bases 토글 OFF**
-   - Bases도 내부적으로 `processFrontMatter`를 호출하여 YAML을 파괴함
+2. **Settings → Editor → Properties in document →** `Source` 로 변경
 
-세 가지 모두 적용해야 완전히 안전하다. 하나만 놓쳐도 Obsidian이 파일을 열 때 frontmatter가 한 줄로 합쳐지거나 `[`, `*`가 `\[`, `\*`로 이스케이프되는 증상이 재발할 수 있다.
+3. **Settings → Core plugins** 에서 다음 토글 OFF:
 
-### 3. Claude Code 준비
+   - `Properties` 토글 OFF
+   - `Bases` 토글 OFF
 
-이 저장소의 `.claude/skills/`를 Claude Code가 자동 인식한다. 별도 설정 불필요. 프로젝트 루트에서 Claude Code를 실행하면 CLAUDE.md가 세션 시작 시 자동 로드된다.
+3가지 모두 필요합니다. 하나만 놓쳐도 frontmatter가 깨질 수 있습니다.
+
+### Step 3 — Claude Code 실행
+
+프로젝트 루트에서 `claude` 명령으로 실행합니다. `CLAUDE.md`가 자동 로드되어 Claude가 프로젝트 규칙을 이해합니다.
+
+### Step 4 — 첫 자료 넣어보기
+
+```bash
+# PDF, 마크다운, 텍스트 모두 가능
+cp ~/some-paper.pdf sources/
+```
+
+Claude에게:
+
+```
+sources 폴더의 파일을 위키에 추가해줘
+```
+
+Claude가 다음을 자동 수행:
+
+- ✅ 파일 읽기 (여러 개면 5개씩 배치)
+- ✅ 소스별 **요약 페이지** 생성 (`wiki/summaries/`)
+- ✅ 등장한 **인물/조직/제품** → `wiki/entities/`
+- ✅ 등장한 **개념/이론** → `wiki/concepts/`
+- ✅ 여러 자료에 걸친 통찰 → `wiki/syntheses/`
+- ✅ `wiki/index.md` 자동 갱신
+- ✅ Obsidian에서 바로 열람 가능
+
+중간에 멈춰도 다음에 이어서 처리됩니다.
+
+### Step 5 — 위키에 질문
+
+```
+양자 컴퓨팅에 대해 알려줘
+```
+
+```
+이 논문과 저 논문의 공통점이 뭐야?
+```
+
+Claude는 **위키에 있는 정보만으로** 답변하며, 어느 페이지에서 가져왔는지 출처를 함께 보여줍니다. 위키에 없는 주제는 외부 지식으로 채우지 않고 "없다"고 정직하게 답합니다.
 
 ---
 
-## 사용법
+## 3대 기능 사용법
 
-### Ingest — 새 자료 수집
+### 📥 Ingest — 새 자료 수집
 
-1. 원본 파일을 `sources/` 폴더에 넣는다 (PDF, 마크다운, 텍스트 등)
-2. Claude에게 요청:
+**언제 쓰나**: `sources/` 폴더에 파일을 추가한 뒤
 
-```
-sources 폴더의 파일들을 위키에 추가해줘
-```
+**어떻게**: 아래 중 아무렇게나 말해도 됩니다.
 
-LLM이 자동으로:
-- 5개씩 배치 처리
-- 소스별 summary 생성 (`wiki/summaries/`)
-- 엔티티/개념 페이지 생성 또는 갱신 (`wiki/entities/`, `wiki/concepts/`)
-- 여러 소스에 걸친 통찰을 synthesis로 기록 (`wiki/syntheses/`)
-- 교차 참조와 index 갱신
-- 진행 상태 저장
+- "sources 폴더의 파일 전부 위키에 추가해줘"
+- "이 문서를 위키에 넣어줘"
+- "새로 추가한 자료 정리해줘"
 
-대량 파일이면 배치마다 중간보고하고 계속 여부를 묻는다. 중간에 끊겨도 다음 실행 시 이어서 처리된다.
+**결과**: `wiki/` 폴더에 4가지 유형의 페이지가 생성됩니다.
 
-### Query — 질의응답
+| 유형 | 역할 | 예시 |
+| --- | --- | --- |
+| Summary | 소스 1개당 허브 페이지 (30줄 이내) | `digital-twin-web-survey.md` |
+| Entity | 고유명사 (인물·회사·제품) | `andrej-karpathy.md`, `siemens.md` |
+| Concept | 추상 개념 (이론·기법) | `wiki-llm.md`, `transformer.md` |
+| Synthesis | 교차 분석 | `rag-vs-wiki-comparison.md` |
 
-```
-디지털 트윈과 온톨로지가 관련 있어?
-```
+### 🔍 Query — 질의응답
 
-```
-위키에 무엇이 있어?
-```
+**언제 쓰나**: 위키에 쌓인 지식이 궁금할 때
 
-LLM이 자동으로:
-- index.md로 관련 페이지 식별
-- Grep으로 키워드 검색 병행
-- 관련 페이지를 읽고 종합
-- 출처 포함 답변 생성
-- 필요 시 새 통찰을 syntheses로 역기록
-- `.wiki-log.md`에 쿼리 기록
+**어떻게**:
 
-답변 형식:
+- "X에 대해 알려줘"
+- "X와 Y의 관계는?"
+- "위키에 뭐가 있어?"
+- "\~사례 있어?"
+
+**답변 형식**:
 
 ```
 {답변 본문}
 
-**참조한 위키 페이지:**
-- [[페이지1]] — ...
+참조한 위키 페이지:
+- [[페이지1]] — 이 페이지에서 가져온 정보
 - [[페이지2]] — ...
 
-**역기록:** 없음 — 기존 정보의 종합이므로 역기록하지 않음
+역기록: 없음 — 기존 정보의 종합이므로 역기록하지 않음
 ```
 
-### Lint — 건강 점검
+**역기록(write-back)**: 여러 페이지를 조합해 **새로운 통찰**이 발견되면 Claude가 자동으로 `syntheses/`에 새 페이지를 만들어 저장합니다. 단순 조회는 역기록하지 않습니다.
 
-```
-위키 점검해줘
-```
+### 🧹 Lint — 건강 점검
 
-LLM이 자동으로:
-- frontmatter 유효성 (필수 필드, summary vs entity 필드 차이)
-- 파일명 컨벤션
-- 깨진 링크, 고아 페이지
-- summary 30줄 초과 여부
-- `[[sources/]]` 유령 노드 탐지
+**언제 쓰나**: 주기적으로 (주 1회 정도 권장)
+
+**어떻게**:
+
+- "위키 점검해줘"
+- "위키 상태 봐줘"
+
+**무엇을 점검하나**:
+
+- frontmatter 필수 필드 누락
+- 깨진 `[[링크]]`
+- 고아 페이지 (어디서도 참조 안 됨)
+- Summary 30줄 초과
 - 페이지 간 모순
-- index 정합성
+- Index.md 정합성
+- `needs-review: true` 플래그 (분류 애매한 페이지)
 
-보고서 + 안전한 자동 수정 (링크 제거, index 동기화 등).
+안전한 수정(링크 정리, index 동기화)은 자동 적용. 모순·중복은 보고만 하고 사용자 판단에 맡깁니다.
+
+---
+
+## 자주 묻는 질문 (FAQ)
+
+### Q. Obsidian 없이도 쓸 수 있나요?
+
+네. 위키는 그냥 마크다운 파일이라 VS Code나 어떤 편집기에서든 열 수 있습니다. Obsidian은 **그래프 뷰·백링크·검색**이 편해서 추천하는 것뿐입니다.
+
+### Q. 위키에 쌓인 정보가 공개 저장소에 올라가지 않나요?
+
+안 올라갑니다. `.gitignore`에서 `sources/`와 `wiki/*/`를 모두 제외합니다. 저장소에는 **구조와 스킬만** 올라가고, 개인 지식은 로컬에만 남습니다.
+
+### Q. PDF는 어떻게 처리되나요?
+
+Claude가 직접 PDF를 읽습니다. 단, 매우 큰 PDF(20페이지+)는 배치 크기를 줄이는 것이 좋습니다. Claude에게 "이 PDF는 크니까 배치 3개씩 처리해줘"라고 말하면 됩니다.
+
+### Q. Claude가 frontmatter를 잘못 만들면요?
+
+`위키 점검해줘` 실행하면 lint가 필수 필드 누락을 자동 수정합니다. 반복되면 스킬 파일을 조정해야 할 수 있습니다.
+
+### Q. 위키가 커지면 느려지지 않나요?
+
+\~100-200 페이지까지는 쾌적합니다. 그 이상이면 Query 시 컨텍스트 부담이 생기므로 RAG 하이브리드를 고려하세요. wiki-llm은 **"압축된 핵심 지식"**, RAG는 \*\*"전체 자료"\*\*로 역할 분담이 자연스럽습니다.
+
+### Q. 다른 프로젝트에 같은 하네스를 쓰고 싶어요
+
+이 저장소를 복제한 뒤 `sources/`와 `wiki/`만 비우면 됩니다. `CLAUDE.md`, `SCHEMA.md`, `.claude/skills/` 는 그대로 재사용 가능합니다.
+
+### Q. 언어는 한국어만 되나요?
+
+아니요. 스킬은 한국어로 작성되어 있지만 위키 페이지 언어는 **소스 언어를 따릅니다**. 영어 논문을 넣으면 영어 위키가 생깁니다. 필요하면 "한국어로 작성해줘"라고 요청 가능.
+
+---
+
+## 문제 해결 (Troubleshooting)
+
+### 🐛 frontmatter가 한 줄로 합쳐졌어요 (`## title: "..." tags:...`)
+
+**원인**: Obsidian의 `processFrontMatter` 버그. 위의 [Step 2 Obsidian 설정](#step-2--obsidian-%EC%84%A4%EC%A0%95-%ED%95%84%EC%88%98-3%EA%B0%80%EC%A7%80) 3가지 모두 적용했는지 확인하세요.
+
+**수정**: Obsidian을 **닫은 상태에서** Claude에게 "위키 점검해줘"라고 하면 자동 수정됩니다.
+
+### 🐛 Obsidian 그래프에 `01-web-research` 같은 유령 노드가 보여요
+
+**원인**: 위키 페이지 안에서 `[[sources/파일명]]` 형태로 참조했기 때문. `sources/`는 vault 밖이라 Obsidian이 "존재하지 않는 페이지"로 인식합니다.
+
+**수정**: "위키 점검해줘" — Lint가 `[[sources/...]]`를 `` `sources/...` `` 코드 형식으로 자동 변환합니다.
+
+### 🐛 Ingest 중간에 멈췄어요
+
+**원인**: 컨텍스트 윈도우 초과 또는 세션 종료.
+
+**수정**: 다시 "sources 폴더 이어서 처리해줘"라고 하면 `wiki/.ingest-progress.json`을 보고 큐의 남은 파일부터 처리합니다.
+
+### 🐛 같은 주제가 여러 파일로 흩어져 있어요
+
+**원인**: LLM이 네이밍 충돌을 감지 못한 경우 (드물지만 발생).
+
+**수정**: "위키 점검해줘" → Lint가 중복 탐지하여 보고. 사용자가 병합 여부 결정.
+
+### 🐛 위키에 있을 법한 정보인데 "없다"고 해요
+
+**원인**: query 스킬이 검색에 실패한 경우. 인덱스 제목에 키워드가 없고 Grep도 동의어를 못 잡으면 발생.
+
+**해결**: 더 구체적인 질문으로 다시 물어보거나, `wiki/index.md`를 직접 열어 관련 페이지를 확인한 뒤 페이지 이름을 명시하여 재질문.
 
 ---
 
@@ -285,34 +264,103 @@ LLM이 자동으로:
 ```
 wiki-llm-harness/
 ├── README.md              ← 이 문서
-├── CLAUDE.md              ← 세션 시작 시 자동 로드 (라우팅, 초기화)
-├── SCHEMA.md              ← 위키 규칙 (페이지 유형, frontmatter, 네이밍)
-├── .wiki-log.md           ← 연산 기록 (ingest/query/lint 이력) — vault 밖
-├── .gitignore             ← 위키 콘텐츠 제외 (구조만 유지)
+├── CLAUDE.md              ← Claude 세션 초기 로드 (라우팅)
+├── SCHEMA.md              ← 위키 규칙 (페이지 유형, frontmatter)
+├── .wiki-log.md           ← 연산 이력 (ingest/query/lint)
 │
 ├── .claude/skills/
-│   ├── wiki-ingest/skill.md   ← 소스 수집 (배치+재개+충돌방지)
-│   ├── wiki-query/skill.md    ← 질의응답 (출처+역기록+로그)
-│   └── wiki-lint/skill.md     ← 건강 점검 (구조+내용+정합성)
+│   ├── wiki-ingest/       ← 소스 수집 스킬
+│   ├── wiki-query/        ← 질의응답 스킬
+│   └── wiki-lint/         ← 건강 점검 스킬
 │
-├── sources/               ← 원본 자료 (불변, 읽기 전용) — gitignored
+├── sources/               ← 원본 자료 (gitignore)
 │
-└── wiki/                  ← Obsidian vault 루트
-    ├── index.md           ← 전체 페이지 카탈로그 (LLM이 먼저 읽음)
+└── wiki/                  ← Obsidian vault (gitignore)
+    ├── index.md           ← 페이지 카탈로그
     ├── summaries/         ← 소스별 요약 허브 (30줄 이내)
-    ├── entities/          ← 인물, 조직, 제품
-    ├── concepts/          ← 이론, 기술, 방법론
-    ├── syntheses/         ← 교차 분석, 통합 정리
-    └── assets/            ← 이미지, 첨부파일
+    ├── entities/          ← 고유명사
+    ├── concepts/          ← 추상 개념
+    ├── syntheses/         ← 교차 분석
+    └── assets/            ← 이미지·첨부
 ```
-
-실제 위키 콘텐츠(`sources/`, `wiki/*/`)는 `.gitignore`로 제외되어 있다. 개인 지식은 공유되지 않으며, 구조만 저장소에 유지된다.
 
 ---
 
-## 라이선스 / 크레딧
+## 철학과 설계 배경 (더 알고 싶으면)
+
+이 하네스는 처음부터 완성형으로 설계되지 않았습니다. 실제 자료를 넣고 Obsidian으로 열어보는 과정에서 부딪힌 문제를 하나씩 해결하며 만들어졌습니다. 각 설계 선택의 이유가 아래에 있습니다.
+
+&lt;details&gt; &lt;summary&gt;&lt;b&gt;Karpathy의 철학 — "장부 정리를 LLM이 전담한다"&lt;/b&gt;&lt;/summary&gt;
+
+Karpathy의 gist를 관통하는 한 문장:
+
+> "지식 기반 유지보수의 지루한 부분은 읽기나 사고가 아니라 \*\*장부 정리(bookkeeping)\*\*다."
+
+기존 RAG는 질의마다 원본을 재발견합니다. 매번 인터프리터가 돌아가는 셈. wiki-llm은 다르게 접근합니다 — 소스를 **한 번 컴파일**해서 영속적 마크다운 위키로 저장하고, 질의 시에는 이 위키만 읽습니다. 컴파일러와 인터프리터의 차이입니다.
+
+**3계층 아키텍처:**
+
+| 계층 | 역할 | 소유자 |
+| --- | --- | --- |
+| Raw Sources | 불변 원본 자료 | 인간이 큐레이션 |
+| Wiki | LLM이 유지하는 마크다운 | LLM이 관리 |
+| Schema | 위키 규칙·컨벤션 | 인간이 설계, LLM이 준수 |
+
+**3대 오퍼레이션**: Ingest / Query / Lint
+
+**4가지 페이지 유형**: Summary / Entity / Concept / Synthesis
+
+&lt;/details&gt;
+
+&lt;details&gt; &lt;summary&gt;&lt;b&gt;실전에서 부딪힌 9가지 문제와 해결&lt;/b&gt;&lt;/summary&gt;
+
+**문제 1: 100개 파일 ingest 시 컨텍스트 터짐**→ 배치 처리(5개/배치) + `.ingest-progress.json`으로 재개 가능
+
+**문제 2: Summary가 소스 복제본이 됨**→ Summary = 30줄 이내 허브 페이지 원칙. 상세는 concept/entity로
+
+**문제 3: LLM이 기존 파일명과 충돌하는 이름 생성**→ 2단계 충돌 감지 (Glob → 내용 비교 → 갱신 or 접미사)
+
+**문제 4: 소스 파일명이 위키에서 무의미**→ `{주제}-{관점}.md` 네이밍 (`01-web-research` → `digital-twin-web-survey`)
+
+**문제 5:** `[[sources/xxx]]` **링크가 Obsidian 유령 노드 생성**→ vault 밖 파일은 `` `sources/xxx` `` 코드 형식으로 참조
+
+**문제 6: Obsidian이 파일을 멋대로 수정 (frontmatter 파괴)**→ 3중 방어: vault 범위 제한 + `propertiesInDocument: source` + Properties/Bases 비활성화
+
+**문제 7: 오케스트레이터 스킬이 과잉 설계**→ 삭제. 라우팅은 CLAUDE.md로 통합
+
+**문제 8: log.md가 Obsidian 그래프 노이즈**→ vault 밖 `.wiki-log.md`로 이동. 운영 메타데이터는 지식과 분리
+
+**문제 9: query 스킬이 설계 형식을 무시**→ 명령형 대신 Why 설명. "이 형식은 Obsidian 백링크 추적을 가능하게 한다"
+
+&lt;/details&gt;
+
+&lt;details&gt; &lt;summary&gt;&lt;b&gt;다른 프로젝트에 적용하는 법&lt;/b&gt;&lt;/summary&gt;
+
+이 저장소를 템플릿으로 복제:
+
+```bash
+git clone https://github.com/bjw202/wiki-llm-harness.git my-knowledge-base
+cd my-knowledge-base
+rm -rf .git
+git init
+```
+
+재사용 가능한 것:
+
+- `CLAUDE.md` — 도메인에 맞게 설명 부분만 수정
+- `SCHEMA.md` — 대부분 그대로 사용 가능
+- `.claude/skills/` — 모두 그대로 재사용
+
+도메인별 조정이 필요한 것:
+
+- Entity vs Concept 경계 사례 (도메인 특유 용어가 있으면 `wiki-ingest/skill.md`의 경계 사례 표에 추가)
+
+&lt;/details&gt;
+
+---
+
+## 크레딧
 
 - 철학: [Andrej Karpathy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
 - 구현: Claude Code 스킬 시스템 기반
-
-이 하네스를 다른 프로젝트에 적용하려면 저장소를 복제하고 `sources/`에 자료를 넣은 뒤 Claude에게 ingest를 요청하면 된다. `CLAUDE.md`, `SCHEMA.md`, 스킬은 그대로 재사용 가능하다.
+- Repo: https://github.com/bjw202/wiki-llm-harness
