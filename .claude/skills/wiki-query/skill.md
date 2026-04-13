@@ -13,30 +13,51 @@ description: "위키에서 정보를 검색하고 질문에 답변하는 스킬.
 
 ## 워크플로우
 
-### 1. 시드 수집
+### 1. 시드 수집 — 인덱스와 Grep **둘 다** 수행한다
 
-**인덱스 + Grep 병행:**
+인덱스와 Grep은 **대체 관계가 아니라 보완 관계**다. 찾는 것이 다르다:
 
-- `wiki/index.md` 읽기 → 질문 키워드와 관련된 페이지 선택
-- Grep으로 `wiki/` 내 키워드 검색 (동의어·유사 표현 포착)
+- **인덱스 스캔**: `wiki/index.md`를 읽는다 → 카테고리별 제목·한 줄 설명 기반. **제목에 키워드가 없는 페이지는 놓친다.**
+- **Grep 전문 검색**: `wiki/` 내 질문 핵심 키워드 리터럴 검색 → **본문에서만 언급된 동의어·유사 표현을 잡는다.**
 
-시드는 보통 2\~4개. 너무 많으면 3단계에서 제한.
+#### 왜 둘 다 필요한가 (구체 예시)
 
-### 2. 그래프 1-hop 확장
+질문: "디지털 트윈과 온톨로지 관련?"
+- 인덱스만 돌리면: `digital-twin.md`, `knowledge-graph.md` 히트 → 여기서 멈추면 핵심 답을 놓친다
+- Grep "온톨로지" 추가: `manufacturing-process-control.md`의 "FDC의 '왜?' → 온톨로지 인과추론" 섹션 발견 (이 페이지 제목에는 "온톨로지"가 없음)
 
-시드 페이지들을 읽으면서 다음을 동시에 수집한다:
+**인덱스 히트 수와 무관하게 Grep을 수행한다.** "인덱스에서 찾았으니 충분해 보임"은 신뢰할 수 있는 신호가 아니라 검증되지 않은 추측이다.
 
-**Outgoing links**: 시드 페이지 본문의 `[[wiki-link]]` 추출 → 시드가 직접 연결한 페이지 **Backlinks**: 시드 페이지 이름을 Grep으로 역검색 (`grep -r "\[\[page-name" wiki/`) → 시드를 참조하는 페이지
+#### 1단계 완료 체크리스트
 
-예:
+아래 **두 산출물이 모두 손에 있어야** 2단계로 넘어간다:
 
-```
-시드: concepts/digital-twin
-Outgoing: concepts/manufacturing-process-control, entities/siemens, syntheses/digital-twin-roi
-Backlinks: summaries/digital-twin-*, syntheses/manufacturing-llm-integration
-```
+- [ ] 인덱스에서 선택한 페이지 목록 (0개여도 명시)
+- [ ] Grep 결과 목록 — 사용한 검색어도 기록
 
-**Syntheses 우선**: 확장 후보 중 `syntheses/` 페이지는 특별히 우선순위를 높인다. syntheses는 "여러 페이지를 교차 분석한 통찰"이라 관계형 질문("X와 Y는?", "비교해줘")의 정답을 담고 있을 확률이 높다.
+하나라도 비어 있거나 "할 필요 없음"으로 판단해 건너뛰었다면, 지금 즉시 돌아가 수행한다. **Grep 호출이 트랜스크립트에 없다면 이 단계는 미완료다.**
+
+시드는 보통 2~4개. 너무 많으면 3단계에서 우선순위로 제한.
+
+### 2. 그래프 1-hop 확장 — Outgoing과 Backlinks **둘 다** 수행한다
+
+시드 페이지만 읽으면 **시드가 참조하지 않는 관련 페이지**를 영구히 놓친다. 확장은 두 방향이 다르다:
+
+- **Outgoing links**: 시드 본문의 `[[wiki-link]]` 추출 → 시드가 **직접 연결한** 페이지
+- **Backlinks**: Grep으로 시드 이름 역검색 (`grep -rn "\[\[concepts/digital-twin" wiki/`) → 시드를 **참조하는** 페이지
+
+두 방향은 비대칭이다. Outgoing에 없는 backlink가 흔하다 — 예를 들어 `syntheses/manufacturing-llm-integration`은 `digital-twin`을 참조하지만 digital-twin.md는 이 synthesis를 참조하지 않는다. Backlinks를 안 하면 이런 페이지를 놓친다.
+
+**Syntheses 우선**: 확장 후보 중 `syntheses/` 페이지는 우선순위를 높인다. "여러 페이지를 교차 분석한 통찰"이므로 관계형 질문("X와 Y는?", "비교해줘")의 정답을 담고 있을 확률이 높다.
+
+#### 2단계 완료 체크리스트
+
+아래 **두 산출물이 모두 손에 있어야** 3단계로 넘어간다:
+
+- [ ] 시드들의 Outgoing `[[links]]` 목록
+- [ ] 시드들로의 Backlinks 목록 (Grep 역검색 결과)
+
+Backlinks Grep 호출이 트랜스크립트에 없다면 이 단계는 미완료다.
 
 ### 3. 읽을 페이지 선택 (컨텍스트 보호)
 
@@ -48,6 +69,10 @@ Backlinks: summaries/digital-twin-*, syntheses/manufacturing-llm-integration
 2. 시드에서 1-hop으로 연결된 syntheses (관계형 질문에 핵심)
 3. 시드에서 1-hop으로 연결된 concept/entity
 4. summaries는 질문이 "이 소스에 뭐 있었어?" 스타일일 때만 읽음 (허브 페이지이므로 본문에 내용 적음)
+
+#### 3단계 진입 전 자문
+
+"내가 지금 페이지를 고르려는 이유가 **검색이 실제로 완결되었기 때문**인가, 아니면 **'찾았다'는 만족감 때문**인가?" 1단계와 2단계의 체크리스트를 다시 본다. 비어 있는 항목이 있으면 거기로 돌아간다. 만족 편향은 LLM의 구조적 경향이라 인지하지 않으면 반복된다.
 
 ### 4. 정보 수집 및 종합
 
