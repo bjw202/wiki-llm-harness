@@ -81,9 +81,35 @@ wiki-llm-harness/
 
 3가지 모두 필요합니다. 하나만 놓쳐도 frontmatter가 깨질 수 있습니다.
 
-### Step 3 — Claude Code 실행
+### Step 3 — AI 에이전트 실행
 
-프로젝트 루트에서 `claude` 명령으로 실행합니다. `CLAUDE.md`가 자동 로드되어 Claude가 프로젝트 규칙을 이해합니다.
+사용하는 도구에 따라 설정이 다릅니다.
+
+#### Claude Code 사용자
+
+프로젝트 루트에서 `claude` 명령으로 실행합니다. `CLAUDE.md`가 자동 로드되어 프로젝트 규칙을 이해합니다. 추가 설정 불필요.
+
+#### Cline (VS Code 확장) 사용자
+
+Cline은 `CLAUDE.md`를 자동 로드하지 않습니다. `.clinerules/` 폴더를 만들고 그 안에 CLAUDE.md를 넣어야 인식합니다.
+
+**방법 A — 이동 (Cline만 사용할 때):**
+
+```bash
+mkdir -p .clinerules
+mv CLAUDE.md .clinerules/CLAUDE.md
+```
+
+**방법 B — 심볼릭 링크 (Claude Code와 Cline 모두 사용할 때, 권장):**
+
+```bash
+mkdir -p .clinerules
+ln -s ../CLAUDE.md .clinerules/CLAUDE.md
+```
+
+이렇게 하면 원본은 프로젝트 루트에 두고 Cline도 동일 파일을 참조합니다. 한쪽에서 수정해도 양쪽에 반영됩니다.
+
+> Windows 사용자는 심볼릭 링크가 제약이 있을 수 있으니 방법 A를 권장합니다.
 
 ### Step 4 — 첫 자료 넣어보기
 
@@ -194,6 +220,18 @@ Claude는 **위키에 있는 정보만으로** 답변하며, 어느 페이지에
 ---
 
 ## 자주 묻는 질문 (FAQ)
+
+### Q. Cline·Cursor 등 다른 AI 에이전트에서도 쓸 수 있나요?
+
+스킬(`.claude/skills/`)은 구조만 있으면 어느 에이전트에서든 읽을 수 있어 호환됩니다. 차이는 **루트 규칙 파일 위치**:
+
+| 도구 | 규칙 파일 경로 |
+|------|-------------|
+| Claude Code | `CLAUDE.md` (프로젝트 루트) |
+| Cline | `.clinerules/CLAUDE.md` |
+| Cursor | `.cursorrules` 또는 `.cursor/rules/` |
+
+[Step 3](#step-3--ai-에이전트-실행)의 심볼릭 링크 방식을 쓰면 여러 도구 동시 지원 가능합니다.
 
 ### Q. Obsidian 없이도 쓸 수 있나요?
 
