@@ -24,8 +24,8 @@ Andrej Karpathy의 [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e
 git clone https://github.com/bjw202/wiki-llm-harness.git
 cd wiki-llm-harness
 
-# 2. sources/ 폴더에 자료 넣기
-cp ~/Downloads/paper.pdf sources/
+# 2. sources/ 폴더에 자료 넣기 (마크다운·텍스트)
+cp ~/Downloads/research-notes.md sources/
 
 # 3. Claude Code 실행 후 요청
 claude
@@ -88,8 +88,8 @@ wiki-llm-harness/
 ### Step 4 — 첫 자료 넣어보기
 
 ```bash
-# PDF, 마크다운, 텍스트 모두 가능
-cp ~/some-paper.pdf sources/
+# 마크다운(.md), 텍스트(.txt) 지원
+cp ~/some-article.md sources/
 ```
 
 Claude에게:
@@ -203,9 +203,9 @@ Claude는 **위키에 있는 정보만으로** 답변하며, 어느 페이지에
 
 안 올라갑니다. `.gitignore`에서 `sources/`와 `wiki/*/`를 모두 제외합니다. 저장소에는 **구조와 스킬만** 올라가고, 개인 지식은 로컬에만 남습니다.
 
-### Q. PDF는 어떻게 처리되나요?
+### Q. 어떤 파일 형식을 지원하나요?
 
-Claude가 직접 PDF를 읽습니다. 단, 매우 큰 PDF(20페이지+)는 배치 크기를 줄이는 것이 좋습니다. Claude에게 "이 PDF는 크니까 배치 3개씩 처리해줘"라고 말하면 됩니다.
+현재는 **텍스트 기반 파일**만 지원합니다 — 마크다운(`.md`), 일반 텍스트(`.txt`). PDF·Word·HTML 등은 미리 마크다운·텍스트로 변환해서 `sources/`에 넣어야 합니다. PDF 직접 파싱은 향후 지원 예정.
 
 ### Q. Claude가 frontmatter를 잘못 만들면요?
 
