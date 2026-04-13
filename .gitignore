@@ -19,14 +19,13 @@ wiki/assets/*
 
 # 위키 메타 파일 (사용자별 데이터 — 초기화 시 자동 생성)
 wiki/index.md
-wiki/log.md
+.wiki-log.md
 
 # 진행 상태 파일
 wiki/.ingest-progress.json
 
-# Obsidian 설정 (vault별 설정은 vault 사용자가 직접)
-wiki/.obsidian/workspace.json
-wiki/.obsidian/workspace-mobile.json
+# Obsidian 설정 (vault별 개인 설정 — README의 설정 가이드 참조)
+wiki/.obsidian/
 
 # 시스템
 .DS_Store

@@ -144,7 +144,18 @@ vault 경계를 존중하는 것이 핵심 — Obsidian은 `wiki/` 폴더를 vau
 
 **해결:** 오케스트레이터 스킬 삭제. CLAUDE.md로 라우팅 통합.
 
-### 문제 8: query 스킬이 설계 형식을 따르지 않았다
+### 문제 8: log.md가 Obsidian 그래프에 노이즈로 들어왔다
+
+**증상:** `wiki/log.md`가 vault 안에 있으니 Obsidian이 ingest/query/lint 이력을 모두 위키 페이지로 취급. 그래프에 "2026-04-12 ingest" 같은 노드가 등장, 시간이 갈수록 누적되어 그래프가 지저분해지고 검색 결과에도 섞임.
+
+**해결:** log는 **지식이 아니라 운영 메타데이터**. vault 밖 `.wiki-log.md` (프로젝트 루트)로 이동.
+- dot-prefix로 Obsidian이 기본 숨김 처리
+- wiki 페이지들 간 `[[links]]`는 그대로 유지됨 (log→wiki 방향은 vault 밖이어도 무방)
+- `.git/` 같은 메타데이터 파일과 같은 취급
+
+반면 `index.md`는 vault 안에 유지 — 지식 카탈로그이자 그래프 허브 역할이므로 Obsidian에 노출되어야 함.
+
+### 문제 9: query 스킬이 설계 형식을 따르지 않았다
 
 **증상:** 스킬이 "답변 끝에 참조 페이지 목록 붙여라"라고 했는데, 실제 실행 시 LLM이 이를 무시하고 본문에 인라인 `(참조: ...)`로 대체. log.md 기록도 빠뜨림.
 
@@ -225,7 +236,7 @@ LLM이 자동으로:
 - 관련 페이지를 읽고 종합
 - 출처 포함 답변 생성
 - 필요 시 새 통찰을 syntheses로 역기록
-- log.md에 쿼리 기록
+- `.wiki-log.md`에 쿼리 기록
 
 답변 형식:
 
@@ -265,6 +276,7 @@ wiki-llm-harness/
 ├── README.md              ← 이 문서
 ├── CLAUDE.md              ← 세션 시작 시 자동 로드 (라우팅, 초기화)
 ├── SCHEMA.md              ← 위키 규칙 (페이지 유형, frontmatter, 네이밍)
+├── .wiki-log.md           ← 연산 기록 (ingest/query/lint 이력) — vault 밖
 ├── .gitignore             ← 위키 콘텐츠 제외 (구조만 유지)
 │
 ├── .claude/skills/
@@ -276,7 +288,6 @@ wiki-llm-harness/
 │
 └── wiki/                  ← Obsidian vault 루트
     ├── index.md           ← 전체 페이지 카탈로그 (LLM이 먼저 읽음)
-    ├── log.md             ← 연산 기록 (ingest/query/lint 이력)
     ├── summaries/         ← 소스별 요약 허브 (30줄 이내)
     ├── entities/          ← 인물, 조직, 제품
     ├── concepts/          ← 이론, 기술, 방법론

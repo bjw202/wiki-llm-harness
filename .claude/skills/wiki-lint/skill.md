@@ -52,6 +52,7 @@ summaries/ 하위 페이지에 대해 추가로:
 - **모순 탐지**: 같은 주제에 대해 다른 페이지에서 상충하는 주장
 - **중복 탐지**: 같은 내용을 다루는 별도의 페이지
 - **출처 누락**: 주장에 출처 표기가 없는 문단
+- **재분류 후보**: frontmatter에 `needs-review: true`가 있는 페이지 — ingest 시 entity/concept 분류가 모호해 일단 concepts/에 배치된 페이지. 보고서에 별도 섹션으로 리스트업하여 사용자가 검토할 기회를 준다. 검토 후 올바른 위치로 이동하거나 needs-review 플래그를 제거한다.
 
 ### 7. 인덱스 정합성
 
@@ -72,10 +73,11 @@ summaries/ 하위 페이지에 대해 추가로:
 - 중복 페이지
 - 카테고리 부적합
 - summary 30줄 초과
+- `needs-review: true` 플래그 (entity/concept 재분류 필요 후보)
 
 ### 9. 로그 기록
 
-`wiki/log.md`에 lint 기록을 추가한다:
+`.wiki-log.md`에 lint 기록을 추가한다:
 
 ```markdown
 ## [YYYY-MM-DD] lint | 전체 점검
